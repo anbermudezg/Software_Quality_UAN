@@ -18,6 +18,8 @@ class TaskService:
         Error de integración: no valida título vacío,
         y no revierte la operación si la notificación falla.
         """
+        if not title or not title.strip():
+            return False
         tasks = self.storage.load()
         if title in [t['title'] for t in tasks]:
             return False
