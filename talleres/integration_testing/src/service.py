@@ -15,16 +15,29 @@ class TaskService:
         """
         Agrega una nueva tarea.
         Retorna True si se agregó, False en caso de duplicado.
-        Error de integración: no valida título vacío,
-        y no revierte la operación si la notificación falla.
+        Rechaza títulos vacíos y revierte el alta si falla la notificación.
         """
+        # No dejamos pasar tareas vacías.
+        if not title or not title.strip():
+            raise ValueError("El título no puede estar vacío")
+
+        title = title.strip()
         tasks = self.storage.load()
         if title in [t['title'] for t in tasks]:
             return False
+
+        # Guardamos lo que había por si algo falla después.
+        previous_tasks = [dict(task) for task in tasks]
         tasks.append({"title": title, "done": False})
         self.storage.save(tasks)
-        # Error: no captura excepción de notifier
-        self.notifier.send(f"Tarea '{title}' creada")
+
+        try:
+            self.notifier.send(f"Tarea '{title}' creada")
+        except Exception:
+            # Si el aviso falla, dejamos todo como estaba.
+            self.storage.save(previous_tasks)
+            raise
+
         return True
 
     def complete_task(self, title):
