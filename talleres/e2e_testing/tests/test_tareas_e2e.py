@@ -1,62 +1,103 @@
 """
-test_tareas_e2e.py — Pruebas E2E iniciales (versión débil).
+Pruebas E2E robustas para el gestor de tareas.
 
-⚠️ ESTAS PRUEBAS SON INTENCIONALMENTE DÉBILES.
-   Pasan aunque el sistema tenga errores graves.
-   El estudiante deberá identificar sus limitaciones y mejorarlas.
-
-Ejecutar:
-    pytest tests/test_tareas_e2e.py -v
+Estas pruebas verifican comportamiento observable de la UI y del estado
+persistido, no solo que las acciones no fallen.
 """
 
 import pytest
+from playwright.sync_api import expect
+
+from tests.page_objects import TaskPage
 
 
-class TestPaginaPrincipal:
-    """Pruebas débiles de la página principal."""
-
-    def test_pagina_carga(self, page):
-        """Verifica que la página responde (solo código HTTP 200)."""
-        # Esta prueba pasa aunque la página esté completamente rota
-        # siempre que no lance un error 500
-        assert page.url is not None
-
-    def test_titulo_visible(self, page):
-        """Verifica que el título de la página existe."""
-        # Aserción débil: solo verifica que el elemento existe, no su contenido
-        title = page.locator("[data-testid='page-title']")
-        assert title.count() >= 0  # Siempre pasa, incluso si no existe
+@pytest.fixture
+def task_page(page):
+    # Uso un Page Object para no repetir locators en cada prueba.
+    return TaskPage(page)
 
 
-class TestCrearTarea:
-    """Pruebas débiles de creación de tareas."""
+class TestCrearTareaFuerte:
+    def test_crear_tarea_la_muestra_en_la_lista(self, task_page):
+        # Creo la tarea y reviso que sí aparezca en pantalla.
+        task_page.create_task("Mi tarea importante")
 
-    def test_formulario_presente(self, page):
-        """Verifica que el formulario existe en la página."""
-        form = page.locator("[data-testid='form-nueva-tarea']")
-        # Aserción débil: no verifica que el formulario funcione
-        assert form.count() >= 0
+        task_page.expect_task_visible("Mi tarea importante")
 
-    def test_agregar_tarea_no_lanza_error(self, page):
-        """Verifica que agregar una tarea no lanza excepción de red."""
-        page.fill("[data-testid='input-titulo']", "Mi tarea")
-        page.click("[data-testid='btn-agregar']")
-        # No verifica que la tarea realmente aparezca en la lista
+    def test_crear_tarea_conserva_el_texto_en_pantalla(self, task_page):
+        task_page.create_task("Revisar el reporte")
+
+        expect(task_page.task_title("Revisar el reporte")).to_have_text("Revisar el reporte")
+
+    def test_crear_varias_tareas_respeta_el_orden(self, task_page):
+        titles = ["Primera tarea", "Segunda tarea", "Tercera tarea"]
+
+        # Agrego varias tareas para comprobar que se muestran en el orden correcto.
+        for title in titles:
+            task_page.create_task(title)
+
+        task_page.expect_task_titles(titles)
 
 
-class TestCompletarTarea:
-    """Pruebas débiles de completar tareas."""
+class TestCompletarTareaFuerte:
+    def test_completar_tarea_muestra_badge_y_tachado(self, task_page):
+        # Primero la creo y luego verifico que quede marcada como completada.
+        task_page.create_task("Tarea a completar")
 
-    def test_completar_tarea_no_lanza_error(self, page):
-        """Verifica que el flujo completar no lanza error de red."""
-        # Primero creamos una tarea
-        page.fill("[data-testid='input-titulo']", "Tarea a completar")
-        page.click("[data-testid='btn-agregar']")
-        page.wait_for_load_state("networkidle")
+        task_page.complete_task("Tarea a completar")
 
-        # Intentamos completarla (sin verificar el resultado)
-        btn = page.locator("[data-testid='btn-completar']").first
-        if btn.count() > 0:
-            btn.click()
-            page.wait_for_load_state("networkidle")
-        # No verifica que la tarea quede marcada como completada
+        task_page.expect_completed("Tarea a completar")
+
+
+class TestEliminarTareaFuerte:
+    def test_eliminar_tarea_la_remueve_de_la_lista(self, task_page):
+        # La idea es comprobar que al borrar, ya no se vea en la lista.
+        task_page.create_task("Tarea a eliminar")
+
+        task_page.delete_task("Tarea a eliminar")
+
+        task_page.expect_task_hidden("Tarea a eliminar")
+        task_page.expect_empty_state()
+
+
+class TestFlujoCompleto:
+    def test_flujo_crear_completar_y_eliminar(self, task_page):
+        title = "Flujo completo de usuario"
+
+        # Este test junta el recorrido completo de la tarea.
+        task_page.create_task(title)
+        task_page.expect_task_visible(title)
+
+        task_page.complete_task(title)
+        task_page.expect_completed(title)
+
+        task_page.delete_task(title)
+        task_page.expect_task_hidden(title)
+        task_page.expect_empty_state()
+
+
+class TestCasosExtremos:
+    def test_crear_tarea_con_titulo_vacio_no_agrega_elementos(self, task_page):
+        # Si el título viene vacío, no debería aparecer nada nuevo.
+        task_page.create_task("")
+
+        task_page.expect_empty_state()
+
+    def test_crear_tareas_duplicadas_solo_deja_una(self, task_page):
+        # Pruebo que la app no repita tareas con el mismo nombre.
+        task_page.create_task("Duplicada")
+        task_page.create_task("Duplicada")
+
+        task_page.expect_task_visible("Duplicada")
+        expect(task_page.task_items()).to_have_count(1)
+
+    def test_lista_vacia_muestra_mensaje_de_estado(self, task_page):
+        task_page.expect_empty_state()
+
+    def test_crear_multiples_tareas_y_verificar_orden(self, task_page):
+        titles = ["Armar informe", "Enviar correo", "Cerrar taller"]
+
+        for title in titles:
+            task_page.create_task(title)
+
+        task_page.expect_task_titles(titles)
