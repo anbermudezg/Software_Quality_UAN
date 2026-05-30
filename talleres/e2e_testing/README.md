@@ -1,4 +1,3 @@
-
 # Taller: Pruebas E2E — Del navegador al sistema completo
 
 ## 🎯 Objetivo
@@ -30,7 +29,7 @@ Este taller se puede realizar de forma **individual** o en **grupos de máximo 3
 1. Instala las dependencias:
 
 ```bash
-pip install -r requirements.txt
+
 playwright install chromium
 ```
 
@@ -75,6 +74,7 @@ pytest tests/test_tareas_e2e.py -v
 3. Analiza el resultado.
 
 Responde:
+
 - ¿Los tests detectaron el error?
 - ¿Por qué siguen pasando?
 - ¿Qué debilidad fundamental tienen estas pruebas E2E?
