@@ -19,13 +19,24 @@ class TaskService:
         y no revierte la operación si la notificación falla.
         """
         tasks = self.storage.load()
+        if not title.strip():
+            return False
         if title in [t['title'] for t in tasks]:
             return False
         tasks.append({"title": title, "done": False})
-        self.storage.save(tasks)
-        # Error: no captura excepción de notifier
-        self.notifier.send(f"Tarea '{title}' creada")
+        try:
+            self.storage.save(tasks)
+        except Exception as e:
+            print(f"Error al guardar tarea: {e}")
+            return False
+        try:
+            self.notifier.send(f"Tarea '{title}' creada")
+        except Exception as e:
+            print(f"Error al enviar notificación: {e}")
+            self.storage.save(tasks[:-1])
+            return False
         return True
+
 
     def complete_task(self, title):
         """Marca una tarea como completada."""
