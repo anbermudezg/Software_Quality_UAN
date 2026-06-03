@@ -1,0 +1,157 @@
+FFFFFFFF.......                                                          [100%]
+=================================== FAILURES ===================================
+_____________ TestTopDown.test_add_task_calls_storage_and_notifier _____________
+
+self = <test_service_integration.TestTopDown object at 0x101b31810>
+
+    def test_add_task_calls_storage_and_notifier(self):
+        # caso normal, guarda y manda notif
+        storage = StubStorage(initial=[{'title': 'Tarea previa', 'done': False}])
+        notifier = StubNotifier()
+        service = TaskService(storage, notifier)
+    
+        result = service.add_task('Comprar leche')
+    
+        assert result is True
+>       assert storage.calls == [
+            ('load', None),
+            ('save', [
+                {'title': 'Tarea previa', 'done': False},
+                {'title': 'Comprar leche', 'done': False},
+            ]),
+        ]
+E       AssertionError: assert [] == [('load', Non...rar leche'}])]
+E         
+E         Right contains 2 more items, first extra item: ('load', None)
+E         Use -v to get more diff
+
+tests/test_service_integration.py:50: AssertionError
+_________ TestTopDown.test_add_task_duplicate_does_not_save_or_notify __________
+
+self = <test_service_integration.TestTopDown object at 0x101b31bd0>
+
+    def test_add_task_duplicate_does_not_save_or_notify(self):
+        # si ya existe no guardes ni notifiques
+        storage = StubStorage(initial=[{'title': 'Duplicada', 'done': False}])
+        notifier = StubNotifier()
+        service = TaskService(storage, notifier)
+    
+        result = service.add_task('Duplicada')
+    
+>       assert result is False
+E       assert True is False
+
+tests/test_service_integration.py:71: AssertionError
+________________ TestTopDown.test_add_task_rejects_empty_title _________________
+
+self = <test_service_integration.TestTopDown object at 0x101ad56e0>
+
+    def test_add_task_rejects_empty_title(self):
+        # titulo vacio no se debe aceptar
+        storage = StubStorage(initial=[{'title': 'Tarea previa', 'done': False}])
+        notifier = StubNotifier()
+        service = TaskService(storage, notifier)
+    
+        result = service.add_task('')
+    
+>       assert result is False
+E       assert True is False
+
+tests/test_service_integration.py:84: AssertionError
+____________ TestTopDown.test_storage_failure_prevents_notification ____________
+
+self = <test_service_integration.TestTopDown object at 0x101ad5940>
+
+    def test_storage_failure_prevents_notification(self):
+        # si storage falla no deberia llamar a notifier
+        storage = StubStorage(initial=[], raise_on_save=True)
+        notifier = StubNotifier()
+        service = TaskService(storage, notifier)
+    
+>       with pytest.raises(RuntimeError, match='Storage failure'):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE <class 'RuntimeError'>
+
+tests/test_service_integration.py:95: Failed
+_____________ TestTopDown.test_notifier_failure_rolls_back_storage _____________
+
+self = <test_service_integration.TestTopDown object at 0x101ac7d10>
+
+    def test_notifier_failure_rolls_back_storage(self):
+        # si el notifier explota, se deshace lo guardado
+        storage = StubStorage(initial=[{'title': 'Existente', 'done': False}])
+        notifier = StubNotifier(raise_on_send=True)
+        service = TaskService(storage, notifier)
+    
+>       with pytest.raises(ConnectionError, match='Notifier failure'):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE <class 'ConnectionError'>
+
+tests/test_service_integration.py:110: Failed
+_____________ TestSandwich.test_service_persists_task_and_notifies _____________
+
+self = <test_service_integration.TestSandwich object at 0x101b31a90>
+tmp_path = PosixPath('/private/var/folders/hr/gx1cmx6j4w531tvbkx8d105w0000gp/T/pytest-of-eleider/pytest-4/test_service_persists_task_and0')
+
+    def test_service_persists_task_and_notifies(self, tmp_path):
+        # prueba con storage real y notifier fake
+        storage_path = tmp_path / 'sandwich_tasks.json'
+        storage = TaskStorage(str(storage_path))
+        notifier = StubNotifier()
+        service = TaskService(storage, notifier)
+    
+        result = service.add_task('Estudiar integración')
+    
+        assert result is True
+>       assert notifier.sent == ["Tarea 'Estudiar integración' creada"]
+E       assert [] == ["Tarea 'Estu...ción' creada"]
+E         
+E         Right contains one more item: "Tarea 'Estudiar integración' creada"
+E         Use -v to get more diff
+
+tests/test_service_integration.py:136: AssertionError
+___________ TestSandwich.test_service_does_not_notify_when_duplicate ___________
+
+self = <test_service_integration.TestSandwich object at 0x101b31d10>
+tmp_path = PosixPath('/private/var/folders/hr/gx1cmx6j4w531tvbkx8d105w0000gp/T/pytest-of-eleider/pytest-4/test_service_does_not_notify_w0')
+
+    def test_service_does_not_notify_when_duplicate(self, tmp_path):
+        storage_path = tmp_path / 'sandwich_tasks.json'
+        storage = TaskStorage(str(storage_path))
+        notifier = StubNotifier()
+        service = TaskService(storage, notifier)
+    
+        service.add_task('Revisar pruebas')
+        result = service.add_task('Revisar pruebas')
+    
+>       assert result is False
+E       assert True is False
+
+tests/test_service_integration.py:148: AssertionError
+_______ TestSandwich.test_service_rejects_empty_title_with_real_storage ________
+
+self = <test_service_integration.TestSandwich object at 0x101ad5810>
+tmp_path = PosixPath('/private/var/folders/hr/gx1cmx6j4w531tvbkx8d105w0000gp/T/pytest-of-eleider/pytest-4/test_service_rejects_empty_tit0')
+
+    def test_service_rejects_empty_title_with_real_storage(self, tmp_path):
+        storage_path = tmp_path / 'sandwich_tasks.json'
+        storage = TaskStorage(str(storage_path))
+        notifier = StubNotifier()
+        service = TaskService(storage, notifier)
+    
+        result = service.add_task('')
+    
+>       assert result is False
+E       assert True is False
+
+tests/test_service_integration.py:160: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_service_integration.py::TestTopDown::test_add_task_calls_storage_and_notifier
+FAILED tests/test_service_integration.py::TestTopDown::test_add_task_duplicate_does_not_save_or_notify
+FAILED tests/test_service_integration.py::TestTopDown::test_add_task_rejects_empty_title
+FAILED tests/test_service_integration.py::TestTopDown::test_storage_failure_prevents_notification
+FAILED tests/test_service_integration.py::TestTopDown::test_notifier_failure_rolls_back_storage
+FAILED tests/test_service_integration.py::TestSandwich::test_service_persists_task_and_notifies
+FAILED tests/test_service_integration.py::TestSandwich::test_service_does_not_notify_when_duplicate
+FAILED tests/test_service_integration.py::TestSandwich::test_service_rejects_empty_title_with_real_storage
+8 failed, 7 passed in 0.16s
