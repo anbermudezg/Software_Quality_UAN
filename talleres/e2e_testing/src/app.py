@@ -41,10 +41,10 @@ def index():
 @app.route("/tasks", methods=["POST"])
 def create_task():
     title = request.form.get("title", "").strip()
-    try:
-        get_repo().add(title)
-    except ValueError:
-        pass  # Silencia duplicados/vacíos — el estudiante deberá mejorar esto
+#    try:
+#        get_repo().add(title)
+#    except ValueError:
+#        pass  # Silencia duplicados/vacíos — el estudiante deberá mejorar esto
     return redirect(url_for("index"))
 
 
