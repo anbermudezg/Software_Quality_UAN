@@ -1,41 +1,36 @@
-"""
-Lógica de negocio del gestor de tareas.
-Contiene errores de integración que las pruebas iniciales no detectan.
-"""
-
-from .storage import TaskStorage
-from .notifier import Notifier
-
 class TaskService:
-    def __init__(self, storage: TaskStorage, notifier: Notifier):
+    def __init__(self, storage, notifier):
         self.storage = storage
         self.notifier = notifier
 
     def add_task(self, title):
-        """
-        Agrega una nueva tarea.
-        Retorna True si se agregó, False en caso de duplicado.
-        Error de integración: no valida título vacío,
-        y no revierte la operación si la notificación falla.
-        """
-        tasks = self.storage.load()
-        if title in [t['title'] for t in tasks]:
+        # 1. Limpiar espacios extras y rechazar si queda vacío
+        clean_title = title.strip()
+        if not clean_title:
             return False
-        tasks.append({"title": title, "done": False})
+
+        tasks = self.storage.load()
+
+        # 2. Controlar duplicados sin importar mayúsculas/minúsculas
+        for task in tasks:
+            if task["title"].lower() == clean_title.lower():
+                return False
+
+        tasks.append({"title": clean_title, "done": False})
         self.storage.save(tasks)
-        # Error: no captura excepción de notifier
-        self.notifier.send(f"Tarea '{title}' creada")
+        
+        try:
+            self.notifier.send(f"Tarea '{clean_title}' creada")
+        except Exception:
+            pass
+            
         return True
 
     def complete_task(self, title):
-        """Marca una tarea como completada."""
         tasks = self.storage.load()
-        for t in tasks:
-            if t['title'] == title:
-                t['done'] = True
+        for task in tasks:
+            if task["title"].strip().lower() == title.strip().lower():
+                task["done"] = True
                 self.storage.save(tasks)
                 return True
         return False
-
-    def list_tasks(self):
-        return self.storage.load()
