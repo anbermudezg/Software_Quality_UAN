@@ -42,9 +42,10 @@ def index():
 def create_task():
     title = request.form.get("title", "").strip()
     try:
-        get_repo().add(title)
+        # get_repo().add(title)  
+        pass  # No guarda la tarea
     except ValueError:
-        pass  # Silencia duplicados/vacíos — el estudiante deberá mejorar esto
+        pass
     return redirect(url_for("index"))
 
 
