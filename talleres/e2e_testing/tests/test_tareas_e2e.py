@@ -1,62 +1,136 @@
 """
-test_tareas_e2e.py — Pruebas E2E iniciales (versión débil).
-
-⚠️ ESTAS PRUEBAS SON INTENCIONALMENTE DÉBILES.
-   Pasan aunque el sistema tenga errores graves.
-   El estudiante deberá identificar sus limitaciones y mejorarlas.
-
-Ejecutar:
-    pytest tests/test_tareas_e2e.py -v
+test_tareas_e2e.py — Pruebas E2E mejoradas según el entregable.
 """
-
 import pytest
+from playwright.sync_api import expect
+from tests.page_objects import TaskPage
 
 
-class TestPaginaPrincipal:
-    """Pruebas débiles de la página principal."""
+class TestCrearTareaFuerte:
+    """Pruebas fuertes de creación de tareas."""
 
-    def test_pagina_carga(self, page):
-        """Verifica que la página responde (solo código HTTP 200)."""
-        # Esta prueba pasa aunque la página esté completamente rota
-        # siempre que no lance un error 500
-        assert page.url is not None
+    def test_crear_tarea_titulo_aparece_en_lista(self, page, live_server):
+        task_page = TaskPage(page)
+        task_page.goto(live_server)
+        task_title = "Tarea de prueba"
+        task_page.create_task(task_title)
+        # Verificar que el título aparece en la lista
+        expect(page.locator("[data-testid='tarea-titulo']").filter(has_text=task_title)).to_be_visible()
 
-    def test_titulo_visible(self, page):
-        """Verifica que el título de la página existe."""
-        # Aserción débil: solo verifica que el elemento existe, no su contenido
-        title = page.locator("[data-testid='page-title']")
-        assert title.count() >= 0  # Siempre pasa, incluso si no existe
+    def test_crear_tarea_incrementa_contador(self, page, live_server):
+        task_page = TaskPage(page)
+        task_page.goto(live_server)
+        initial_count = task_page.get_task_count()
+        task_page.create_task("Otra tarea")
+        expect(task_page.lista_tareas.locator("[data-testid='tarea-item']")).to_have_count(initial_count + 1)
 
-
-class TestCrearTarea:
-    """Pruebas débiles de creación de tareas."""
-
-    def test_formulario_presente(self, page):
-        """Verifica que el formulario existe en la página."""
-        form = page.locator("[data-testid='form-nueva-tarea']")
-        # Aserción débil: no verifica que el formulario funcione
-        assert form.count() >= 0
-
-    def test_agregar_tarea_no_lanza_error(self, page):
-        """Verifica que agregar una tarea no lanza excepción de red."""
-        page.fill("[data-testid='input-titulo']", "Mi tarea")
-        page.click("[data-testid='btn-agregar']")
-        # No verifica que la tarea realmente aparezca en la lista
+    def test_crear_tarea_limpiar_input(self, page, live_server):
+        task_page = TaskPage(page)
+        task_page.goto(live_server)
+        task_page.input_titulo.fill("Algun título")
+        task_page.btn_agregar.click()
+        # Después de agregar, el input debería estar vacío
+        expect(task_page.input_titulo).to_be_empty()
 
 
-class TestCompletarTarea:
-    """Pruebas débiles de completar tareas."""
+class TestCompletarTareaFuerte:
+    """Pruebas fuertes de completar tareas."""
 
-    def test_completar_tarea_no_lanza_error(self, page):
-        """Verifica que el flujo completar no lanza error de red."""
-        # Primero creamos una tarea
-        page.fill("[data-testid='input-titulo']", "Tarea a completar")
-        page.click("[data-testid='btn-agregar']")
-        page.wait_for_load_state("networkidle")
+    def test_completar_tarea_muestra_badge_y_tachado(self, page, live_server):
+        task_page = TaskPage(page)
+        task_page.goto(live_server)
+        task_page.create_task("Tarea a completar")
+        # Obtener el ID de la tarea recién creada (asumimos solo una)
+        tarea_items = page.locator("[data-testid='tarea-item']")
+        expect(tarea_items).to_have_count(1)
+        task_id = tarea_items.get_attribute("data-task-id")
+        # Completar la tarea
+        task_page.complete_task(task_id)
+        # Verificar badge visible
+        expect(task_page.badge_completada(task_id)).to_be_visible()
+        # Verificar que el título tiene la clase 'done' (tachado)
+        titulo = task_page.tarea_titulo(task_id)
+        expect(titulo).to_have_class("task-title done")
 
-        # Intentamos completarla (sin verificar el resultado)
-        btn = page.locator("[data-testid='btn-completar']").first
-        if btn.count() > 0:
-            btn.click()
-            page.wait_for_load_state("networkidle")
-        # No verifica que la tarea quede marcada como completada
+
+class TestEliminarTareaFuerte:
+    """Pruebas fuertes de eliminar tareas."""
+
+    def test_eliminar_tarea_desaparece_de_lista(self, page, live_server):
+        task_page = TaskPage(page)
+        task_page.goto(live_server)
+        task_page.create_task("Tarea a eliminar")
+        tarea_items = page.locator("[data-testid='tarea-item']")
+        expect(tarea_items).to_have_count(1)
+        task_id = tarea_items.get_attribute("data-task-id")
+        # Eliminar la tarea
+        task_page.delete_task(task_id)
+        # Verificar que el elemento ya no está en el DOM
+        expect(task_page.tarea_item(task_id)).not_to_be_attached()
+        # Alternativamente, verificar que la lista esté vacía
+        expect(task_page.lista_tareas.locator("[data-testid='tarea-item']")).to_have_count(0)
+
+
+class TestFlujoCompleto:
+    """Flujo completo: crear → completar → eliminar."""
+
+    def test_flujo_crear_completar_eliminar(self, page, live_server):
+        task_page = TaskPage(page)
+        task_page.goto(live_server)
+        # Crear
+        task_page.create_task("Flujo completo")
+        tarea_items = page.locator("[data-testid='tarea-item']")
+        expect(tarea_items).to_have_count(1)
+        task_id = tarea_items.get_attribute("data-task-id")
+        # Completar
+        task_page.complete_task(task_id)
+        expect(task_page.badge_completada(task_id)).to_be_visible()
+        titulo = task_page.tarea_titulo(task_id)
+        expect(titulo).to_have_class("task-title done")
+        # Eliminar
+        task_page.delete_task(task_id)
+        expect(task_page.tarea_item(task_id)).not_to_be_attached()
+
+
+class TestCasosExtremos:
+    """Pruebas de casos extremos y validaciones."""
+
+    def test_titulo_vacio_no_crea_tarea(self, page, live_server):
+        task_page = TaskPage(page)
+        task_page.goto(live_server)
+        task_page.input_titulo.fill("   ")  # solo espacios
+        task_page.btn_agregar.click()
+        # La lista debe seguir vacía
+        expect(task_page.lista_tareas.locator("[data-testid='tarea-item']")).to_have_count(0)
+        # Además, el mensaje de lista vacía debería ser visible
+        expect(task_page.msg_lista_vacia()).to_be_visible()
+
+    def test_tarea_duplicada_no_se_crea(self, page, live_server):
+        task_page = TaskPage(page)
+        task_page.goto(live_server)
+        task_page.create_task("Tarea única")
+        # Intentar crear otra con el mismo título
+        task_page.input_titulo.fill("Tarea única")
+        task_page.btn_agregar.click()
+        # La cantidad de tareas debería seguir siendo 1
+        expect(task_page.lista_tareas.locator("[data-testid='tarea-item']")).to_have_count(1)
+        # No debería aparecer mensaje de error explícito, pero podemos verificar que no haya duplicados en la lista
+        titles = task_page.get_task_titles()
+        assert titles.count("Tarea única") == 1
+
+    def test_lista_vacia_muestra_mensaje(self, page, live_server):
+        task_page = TaskPage(page)
+        task_page.goto(live_server)
+        # No hay tareas inicialmente (porque se limpia en conftest)
+        expect(task_page.msg_lista_vacia()).to_be_visible()
+        expect(task_page.lista_tareas.locator("[data-testid='tarea-item']")).to_have_count(0)
+
+    def test_multiples_tareas_orden(self, page, live_server):
+        task_page = TaskPage(page)
+        task_page.goto(live_server)
+        task_page.create_task("Primera")
+        task_page.create_task("Segunda")
+        task_page.create_task("Tercera")
+        titles = task_page.get_task_titles()
+        assert titles == ["Primera", "Segunda", "Tercera"]
+        expect(task_page.lista_tareas.locator("[data-testid='tarea-item']")).to_have_count(3)
