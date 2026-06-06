@@ -1,62 +1,97 @@
-"""
-test_tareas_e2e.py — Pruebas E2E iniciales (versión débil).
-
-⚠️ ESTAS PRUEBAS SON INTENCIONALMENTE DÉBILES.
-   Pasan aunque el sistema tenga errores graves.
-   El estudiante deberá identificar sus limitaciones y mejorarlas.
-
-Ejecutar:
-    pytest tests/test_tareas_e2e.py -v
-"""
-
-import pytest
+from tests.page_objects import TaskPage
 
 
-class TestPaginaPrincipal:
-    """Pruebas débiles de la página principal."""
+class TestCrearTareaFuerte:
+    def test_crear_tarea_muestra_titulo_en_lista(self, page):
+        task_page = TaskPage(page)
+        titulo = "Tarea fuerte"
 
-    def test_pagina_carga(self, page):
-        """Verifica que la página responde (solo código HTTP 200)."""
-        # Esta prueba pasa aunque la página esté completamente rota
-        # siempre que no lance un error 500
-        assert page.url is not None
+        task_page.create_task(titulo)
 
-    def test_titulo_visible(self, page):
-        """Verifica que el título de la página existe."""
-        # Aserción débil: solo verifica que el elemento existe, no su contenido
-        title = page.locator("[data-testid='page-title']")
-        assert title.count() >= 0  # Siempre pasa, incluso si no existe
+        assert task_page.task_titles() == [titulo]
+        assert not task_page.has_empty_list_message()
 
 
-class TestCrearTarea:
-    """Pruebas débiles de creación de tareas."""
+class TestCompletarTareaFuerte:
+    def test_completar_tarea_muestra_badge_y_estado_completado(self, page):
+        task_page = TaskPage(page)
+        titulo = "Tarea completa"
 
-    def test_formulario_presente(self, page):
-        """Verifica que el formulario existe en la página."""
-        form = page.locator("[data-testid='form-nueva-tarea']")
-        # Aserción débil: no verifica que el formulario funcione
-        assert form.count() >= 0
+        task_page.create_task(titulo)
+        task_page.complete_task_by_title(titulo)
 
-    def test_agregar_tarea_no_lanza_error(self, page):
-        """Verifica que agregar una tarea no lanza excepción de red."""
-        page.fill("[data-testid='input-titulo']", "Mi tarea")
-        page.click("[data-testid='btn-agregar']")
-        # No verifica que la tarea realmente aparezca en la lista
+        assert task_page.is_task_completed_by_title(titulo)
+        assert titulo in task_page.task_titles()
 
 
-class TestCompletarTarea:
-    """Pruebas débiles de completar tareas."""
+class TestEliminarTareaFuerte:
+    def test_eliminar_tarea_desaparece_de_lista(self, page):
+        task_page = TaskPage(page)
+        titulo = "Tarea a eliminar"
 
-    def test_completar_tarea_no_lanza_error(self, page):
-        """Verifica que el flujo completar no lanza error de red."""
-        # Primero creamos una tarea
-        page.fill("[data-testid='input-titulo']", "Tarea a completar")
-        page.click("[data-testid='btn-agregar']")
-        page.wait_for_load_state("networkidle")
+        task_page.create_task(titulo)
+        task_page.delete_task_by_title(titulo)
 
-        # Intentamos completarla (sin verificar el resultado)
-        btn = page.locator("[data-testid='btn-completar']").first
-        if btn.count() > 0:
-            btn.click()
-            page.wait_for_load_state("networkidle")
-        # No verifica que la tarea quede marcada como completada
+        assert titulo not in task_page.task_titles()
+        assert task_page.task_count() == 0
+        assert task_page.has_empty_list_message()
+
+
+class TestFlujoCompleto:
+    def test_crear_completar_eliminar_tarea(self, page):
+        task_page = TaskPage(page)
+        titulo = "Flujo completo"
+
+        task_page.create_task(titulo)
+        assert titulo in task_page.task_titles()
+
+        task_page.complete_task_by_title(titulo)
+        assert task_page.is_task_completed_by_title(titulo)
+
+        task_page.delete_task_by_title(titulo)
+        assert titulo not in task_page.task_titles()
+        assert task_page.has_empty_list_message()
+
+
+class TestCasosExtremos:
+    def test_crear_tarea_con_titulo_vacio_no_agrega_nada(self, page):
+        task_page = TaskPage(page)
+
+        task_page.create_task("")
+
+        assert task_page.task_count() == 0
+        assert task_page.has_empty_list_message()
+
+    def test_crear_tarea_con_espacios_vacios_no_agrega_nada(self, page):
+        task_page = TaskPage(page)
+
+        task_page.create_task("   ")
+
+        assert task_page.task_count() == 0
+        assert task_page.has_empty_list_message()
+
+    def test_crear_tarea_duplicada_no_duplica_la_lista(self, page):
+        task_page = TaskPage(page)
+        titulo = "Tarea duplicada"
+
+        task_page.create_task(titulo)
+        task_page.create_task(titulo)
+
+        assert task_page.task_count() == 1
+        assert task_page.task_titles() == [titulo]
+
+    def test_lista_vacia_muestra_mensaje(self, page):
+        task_page = TaskPage(page)
+
+        assert task_page.task_count() == 0
+        assert task_page.has_empty_list_message()
+        assert task_page.empty_list_message_text() == "No hay tareas. ¡Agrega una!"
+
+    def test_crear_multiples_tareas_preserva_el_orden(self, page):
+        task_page = TaskPage(page)
+        titulos = ["Tarea uno", "Tarea dos", "Tarea tres"]
+
+        for titulo in titulos:
+            task_page.create_task(titulo)
+
+        assert task_page.task_titles() == titulos
